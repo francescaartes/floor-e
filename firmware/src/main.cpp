@@ -22,6 +22,7 @@ const char *MQTT_TOPIC = "robot/drive";
 
 const unsigned long WIFI_RETRY_INTERVAL_MS = 5000;
 const unsigned long MQTT_RETRY_INTERVAL_MS = 5000;
+const unsigned long COMMAND_TIMEOUT_MS = 1000;
 
 WiFiClientSecure espClient;
 PubSubClient mqttClient(espClient);
@@ -34,6 +35,9 @@ ESP32PWM rightReversePwm;
 
 unsigned long lastWifiAttemptAt = 0;
 unsigned long lastMqttAttemptAt = 0;
+
+unsigned long lastCommandAt = 0;
+bool motorsRunning = false;
 
 // Network Functions
 void connectWifi()
@@ -100,6 +104,7 @@ void drive(int leftSpeed, int rightSpeed)
 {
     setTrack(leftForwardPwm, leftReversePwm, leftSpeed);
     setTrack(rightForwardPwm, rightReversePwm, rightSpeed);
+    motorsRunning = leftSpeed != 0 || rightSpeed != 0;
 }
 
 void stopMotors()
@@ -162,6 +167,21 @@ void handleCommand(const String &command)
     {
         Serial.println("Unknown: " + command);
     }
+
+    lastCommandAt = millis();
+}
+
+// Watchdog function
+void enforceSafetyTimeout()
+{
+    if (!motorsRunning)
+        return; // If already stopped, do nothing
+
+    if (millis() - lastCommandAt > COMMAND_TIMEOUT_MS)
+    {
+        Serial.println("Command timeout; stopping motors");
+        stopMotors();
+    }
 }
 
 // MQTT Callback
@@ -189,6 +209,8 @@ void setup()
     lastWifiAttemptAt = millis() - WIFI_RETRY_INTERVAL_MS;
     lastMqttAttemptAt = millis() - MQTT_RETRY_INTERVAL_MS;
 
+    lastCommandAt = millis();
+
     Serial.println("System Booting...");
 }
 
@@ -201,4 +223,6 @@ void loop()
     {
         mqttClient.loop(); // MQTT loop
     }
+
+    enforceSafetyTimeout(); // Check watchdog every frame
 }
