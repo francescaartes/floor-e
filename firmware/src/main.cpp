@@ -121,6 +121,57 @@ void setupPwm()
     stopMotors();
 }
 
+// Command Parser
+String payloadToCommand(byte *payload, unsigned int length)
+{
+    String command;
+    command.reserve(length);
+    for (unsigned int i = 0; i < length; i++)
+    {
+        command += static_cast<char>(payload[i]);
+    }
+    command.trim();
+    command.toUpperCase();
+    return command;
+}
+
+// Dispatch Command
+void handleCommand(const String &command)
+{
+    if (command == "FORWARD")
+    {
+        drive(DRIVE_SPEED, DRIVE_SPEED);
+    }
+    else if (command == "REVERSE" || command == "BACK")
+    {
+        drive(-DRIVE_SPEED, -DRIVE_SPEED);
+    }
+    else if (command == "LEFT")
+    {
+        drive(-DRIVE_SPEED, DRIVE_SPEED);
+    }
+    else if (command == "RIGHT")
+    {
+        drive(DRIVE_SPEED, -DRIVE_SPEED);
+    }
+    else if (command == "STOP")
+    {
+        stopMotors();
+    }
+    else
+    {
+        Serial.println("Unknown: " + command);
+    }
+}
+
+// MQTT Callback
+void mqttCallback(char *topic, byte *payload, unsigned int length)
+{
+    if (String(topic) != MQTT_TOPIC)
+        return;
+    handleCommand(payloadToCommand(payload, length));
+}
+
 void setup()
 {
     Serial.begin(115200);
@@ -132,6 +183,7 @@ void setup()
     WiFi.mode(WIFI_STA);
     espClient.setInsecure();
     mqttClient.setServer(MQTT_HOST, MQTT_PORT);
+    mqttClient.setCallback(mqttCallback);
     mqttClient.setKeepAlive(15);
 
     lastWifiAttemptAt = millis() - WIFI_RETRY_INTERVAL_MS;
