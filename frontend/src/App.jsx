@@ -1,122 +1,202 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useEffect, useRef, useState } from "react";
+import mqtt from "mqtt";
+import StatusHeader from "./components/StatusHeader";
+import VoiceController from "./components/VoiceController";
+import TelemetryGrid from "./components/TelemetryGrid";
+import "./App.css";
 
-function App() {
-  const [count, setCount] = useState(0)
+const MQTT_URL = "wss://88851ab995354e9da75db5b5a3e5560b.s1.eu.hivemq.cloud:8884/mqtt";
+const MQTT_TOPIC = "robot/drive";
+const MQTT_USERNAME = "Floor-E";
+const MQTT_PASSWORD = "Floor-E-01";
 
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+const COMMAND_PATTERNS = [
+    { command: "FORWARD", words: ["FORWARD"] },
+    { command: "REVERSE", words: ["REVERSE", "BACK"] },
+    { command: "LEFT", words: ["LEFT"] },
+    { command: "RIGHT", words: ["RIGHT"] },
+    { command: "STOP", words: ["STOP"] },
+];
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+function parseCommand(transcript) {
+    const normalized = transcript.toUpperCase();
+    return COMMAND_PATTERNS.find(({ words }) =>
+        words.some((word) => normalized.includes(word)),
+    )?.command;
 }
 
-export default App
+function createSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return null;
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.maxAlternatives = 1;
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    return recognition;
+}
+
+function App() {
+    const mqttClientRef = useRef(null);
+    const recognitionRef = useRef(null);
+    const isIntentionallyListening = useRef(false);
+    const activeCommandRef = useRef("STOP");
+
+    const [connectionStatus, setConnectionStatus] = useState("Connecting");
+    const [speechStatus, setSpeechStatus] = useState("Idle");
+    const [transcript, setTranscript] = useState("");
+    const [lastCommand, setLastCommand] = useState("None");
+    const [error, setError] = useState("");
+
+    // MQTT Connection Setup
+    useEffect(() => {
+        const client = mqtt.connect(MQTT_URL, {
+            username: MQTT_USERNAME,
+            password: MQTT_PASSWORD,
+            clean: true,
+            connectTimeout: 10_000,
+            reconnectPeriod: 2_000,
+            clientId: `floor-e-web-${Math.random().toString(16).slice(2)}`, 
+        });
+
+        mqttClientRef.current = client;
+
+        client.on("connect", () => {
+            setConnectionStatus("Connected");
+            setError("");
+        });
+        client.on("reconnect", () => setConnectionStatus("Reconnecting"));
+        client.on("close", () => setConnectionStatus("Disconnected"));
+        client.on("offline", () => setConnectionStatus("Offline"));
+        client.on("error", (mqttError) => {
+            console.error("MQTT Error:", mqttError);
+            setConnectionStatus("Error");
+            setError(mqttError.message || "Connection refused");
+        });
+
+        return () => {
+            client.end(true);
+            mqttClientRef.current = null;
+        };
+    }, []);
+
+    // Heartbeat Interval for Watchdog Safety
+    useEffect(() => {
+        const heartbeat = setInterval(() => {
+            const client = mqttClientRef.current;
+            const currentCmd = activeCommandRef.current;
+
+            if (client?.connected && currentCmd !== "STOP") {
+                client.publish(MQTT_TOPIC, currentCmd, { qos: 0, retain: false });
+            }
+        }, 500);
+
+        return () => clearInterval(heartbeat);
+    }, []);
+
+    // Speech Recognition Init
+    useEffect(() => {
+        recognitionRef.current = createSpeechRecognition();
+        return () => {
+            recognitionRef.current?.abort();
+        };
+    }, []);
+
+    const publishCommand = (command) => {
+        const client = mqttClientRef.current;
+        if (!client?.connected) {
+            setError("MQTT is not connected yet.");
+            return;
+        }
+
+        activeCommandRef.current = command;
+
+        client.publish(MQTT_TOPIC, command, { qos: 0, retain: false }, (err) => {
+            if (err) {
+                setError(err.message);
+                return;
+            }
+            setLastCommand(command);
+            setError("");
+        });
+    };
+
+    const toggleListening = () => {
+        const recognition = recognitionRef.current;
+        if (!recognition) {
+            setError("This browser does not support the Web Speech API.");
+            return;
+        }
+
+        if (isIntentionallyListening.current) {
+            isIntentionallyListening.current = false;
+            recognition.stop();
+            setSpeechStatus("Idle");
+            publishCommand("STOP");
+            return;
+        }
+
+        isIntentionallyListening.current = true;
+        setSpeechStatus("Listening");
+        setTranscript("");
+        setError("");
+
+        recognition.onresult = (event) => {
+            const latestResultIndex = event.results.length - 1;
+            const spokenText = event.results[latestResultIndex][0].transcript;
+            const command = parseCommand(spokenText);
+
+            setTranscript(spokenText);
+
+            if (command && command !== activeCommandRef.current) {
+                publishCommand(command);
+            }
+        };
+
+        recognition.onerror = (event) => {
+            if (event.error === "no-speech") return;
+            setSpeechStatus("Idle");
+            isIntentionallyListening.current = false;
+            setError(`Speech recognition error: ${event.error}`);
+        };
+
+        recognition.onend = () => {
+            if (isIntentionallyListening.current) {
+                try {
+                    recognition.start();
+                } catch (e) {
+                    console.error("Auto-restart failed", e);
+                }
+            } else {
+                setSpeechStatus("Idle");
+            }
+        };
+
+        try {
+            recognition.start();
+        } catch (e) {
+            console.error("Recognition already started");
+        }
+    };
+
+    return (
+        <main className="app-shell">
+            <section className="control-panel" aria-labelledby="app-title">
+                <StatusHeader connectionStatus={connectionStatus} topic={MQTT_TOPIC} />
+                
+                <VoiceController speechStatus={speechStatus} onToggleListening={toggleListening} />
+                
+                <TelemetryGrid transcript={transcript} lastCommand={lastCommand} speechStatus={speechStatus} />
+
+                {error && (
+                    <p className="error-message" role="alert">
+                        {error}
+                    </p>
+                )}
+            </section>
+        </main>
+    );
+}
+
+export default App;
