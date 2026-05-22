@@ -22,7 +22,7 @@ const char *MQTT_TOPIC = "robot/drive";
 
 const unsigned long WIFI_RETRY_INTERVAL_MS = 5000;
 const unsigned long MQTT_RETRY_INTERVAL_MS = 5000;
-const unsigned long COMMAND_TIMEOUT_MS = 1000;
+const unsigned long COMMAND_TIMEOUT_MS = 5000;
 
 WiFiClientSecure espClient;
 PubSubClient mqttClient(espClient);
@@ -145,22 +145,27 @@ void handleCommand(const String &command)
 {
     if (command == "FORWARD")
     {
+        Serial.println("FORWARD");
         drive(DRIVE_SPEED, DRIVE_SPEED);
     }
     else if (command == "REVERSE" || command == "BACK")
     {
+        Serial.println("REVERSE");
         drive(-DRIVE_SPEED, -DRIVE_SPEED);
     }
     else if (command == "LEFT")
     {
+        Serial.println("LEFT");
         drive(-DRIVE_SPEED, DRIVE_SPEED);
     }
     else if (command == "RIGHT")
     {
+        Serial.println("RIGHT");
         drive(DRIVE_SPEED, -DRIVE_SPEED);
     }
     else if (command == "STOP")
     {
+        Serial.println("STOP");
         stopMotors();
     }
     else
@@ -194,6 +199,16 @@ void mqttCallback(char *topic, byte *payload, unsigned int length)
 
 void setup()
 {
+    pinMode(LEFT_IN1_PIN, OUTPUT);
+    pinMode(LEFT_IN2_PIN, OUTPUT);
+    pinMode(RIGHT_IN3_PIN, OUTPUT);
+    pinMode(RIGHT_IN4_PIN, OUTPUT);
+
+    digitalWrite(LEFT_IN1_PIN, LOW);
+    digitalWrite(LEFT_IN2_PIN, LOW);
+    digitalWrite(RIGHT_IN3_PIN, LOW);
+    digitalWrite(RIGHT_IN4_PIN, LOW);
+
     Serial.begin(115200);
     delay(100);
 
