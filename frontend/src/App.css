@@ -171,3 +171,74 @@ body {
   font-size: 0.9rem;
   text-align: center;
 }
+
+/* ==========================================================================
+   Authentication Styles
+   ========================================================================== */
+.auth-card {
+  text-align: center;
+  box-sizing: border-box;
+  padding-top: 50px;    
+  padding-bottom: 20px; 
+}
+
+.auth-title-block h1 {
+  margin-bottom: 20px !important; 
+}
+
+.auth-title-block p {
+  margin-bottom: 40px !important; 
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.auth-input {
+  width: 100%;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #2a364a;
+  background-color: #1e2633;
+  color: white;
+  font-size: 1rem;
+  box-sizing: border-box;
+  text-align: center;
+  transition: border-color 0.2s ease;
+}
+
+.auth-input:focus {
+  outline: none;
+  border-color: #0d7a70;
+}
+
+.connect-btn {
+  margin-bottom: 0;
+}
+
+.error-zone {
+  min-height: 65px; 
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 400px;
+  margin: 10px auto 0 auto;
+}
+
+.error-message {
+  width: 100%;
+  margin-top: 0; 
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  padding: 12px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  text-align: center;
+}

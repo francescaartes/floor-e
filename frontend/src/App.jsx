@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import mqtt from "mqtt";
+import Login from "./components/Login";
 import StatusHeader from "./components/StatusHeader";
 import VoiceController from "./components/VoiceController";
 import TelemetryGrid from "./components/TelemetryGrid";
@@ -43,6 +44,10 @@ function App() {
     const isIntentionallyListening = useRef(false);
     const activeCommandRef = useRef("STOP");
 
+    // Authentication State
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+    // Telemetry and Connection States
     const [connectionStatus, setConnectionStatus] = useState("Connecting");
     const [speechStatus, setSpeechStatus] = useState("Idle");
     const [transcript, setTranscript] = useState("");
@@ -51,6 +56,8 @@ function App() {
 
     // MQTT Connection Setup
     useEffect(() => {
+        if (!isAuthenticated) return;
+
         const client = mqtt.connect(MQTT_URL, {
             username: MQTT_USERNAME,
             password: MQTT_PASSWORD,
@@ -79,10 +86,12 @@ function App() {
             client.end(true);
             mqttClientRef.current = null;
         };
-    }, []);
+    }, [isAuthenticated]);
 
     // Heartbeat Interval for Watchdog Safety
     useEffect(() => {
+        if (!isAuthenticated) return;
+
         const heartbeat = setInterval(() => {
             const client = mqttClientRef.current;
             const currentCmd = activeCommandRef.current;
@@ -93,15 +102,17 @@ function App() {
         }, 500);
 
         return () => clearInterval(heartbeat);
-    }, []);
+    }, [isAuthenticated]);
 
     // Speech Recognition Init
     useEffect(() => {
+        if (!isAuthenticated) return;
+        
         recognitionRef.current = createSpeechRecognition();
         return () => {
             recognitionRef.current?.abort();
         };
-    }, []);
+    }, [isAuthenticated]);
 
     const publishCommand = (command) => {
         const client = mqttClientRef.current;
@@ -179,6 +190,10 @@ function App() {
             console.error("Recognition already started");
         }
     };
+
+    if (!isAuthenticated) {
+        return <Login onAuthenticated={setIsAuthenticated} />;
+    }
 
     return (
         <main className="app-shell">
