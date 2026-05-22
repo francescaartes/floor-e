@@ -36,8 +36,13 @@ body {
   padding: 40px;
   width: 100%;
   max-width: 650px;
+  min-height: 415px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
   position: relative;
+  box-sizing: border-box; 
+  display: flex;         
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 /* ==========================================================================
@@ -180,6 +185,7 @@ body {
   box-sizing: border-box;
   padding-top: 50px;    
   padding-bottom: 20px; 
+  justify-content: center;
 }
 
 .auth-title-block h1 {
@@ -231,7 +237,7 @@ body {
   margin: 10px auto 0 auto;
 }
 
-.error-message {
+.error-zone .error-message {
   width: 100%;
   margin-top: 0; 
   background-color: rgba(239, 68, 68, 0.1);
