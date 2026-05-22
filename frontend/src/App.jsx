@@ -5,10 +5,10 @@ import VoiceController from "./components/VoiceController";
 import TelemetryGrid from "./components/TelemetryGrid";
 import "./App.css";
 
-const MQTT_URL = "wss://88851ab995354e9da75db5b5a3e5560b.s1.eu.hivemq.cloud:8884/mqtt";
-const MQTT_TOPIC = "robot/drive";
-const MQTT_USERNAME = "Floor-E";
-const MQTT_PASSWORD = "Floor-E-01";
+const MQTT_URL = import.meta.env.VITE_MQTT_URL;
+const MQTT_TOPIC = import.meta.env.VITE_MQTT_TOPIC;
+const MQTT_USERNAME = import.meta.env.VITE_MQTT_USERNAME;
+const MQTT_PASSWORD = import.meta.env.VITE_MQTT_PASSWORD;
 
 const COMMAND_PATTERNS = [
     { command: "FORWARD", words: ["FORWARD"] },
